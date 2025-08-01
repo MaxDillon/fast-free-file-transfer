@@ -26,3 +26,25 @@ Your app is ready to be deployed!
 ## Deployment
 
 Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)
+
+## Tailwind CSS Setup
+
+1. Install dependencies:
+   ```sh
+   npm install -D tailwindcss postcss autoprefixer
+   npx tailwindcss init -p
+   ```
+2. Add the following to your `tailwind.config.js` content array:
+   ```js
+   content: [
+     './index.html',
+     './src/**/*.{js,ts,jsx,tsx}',
+   ],
+   ```
+3. Add Tailwind's directives to your `src/index.css`:
+   ```css
+   @tailwind base;
+   @tailwind components;
+   @tailwind utilities;
+   ```
+4. Use Tailwind utility classes in your components.
