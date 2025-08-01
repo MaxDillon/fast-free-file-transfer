@@ -1,6 +1,7 @@
 import { createSignal, createEffect } from "solid-js";
 import Peer from "peerjs";
 import type { Step } from "./types";
+import { v4 as uuidv4 } from "uuid";
 
 type DataConnection = import("peerjs").DataConnection;
 
@@ -32,7 +33,11 @@ export function usePeerConnection() {
     setSessionReady(false);
     setStep("share-offer");
     setError("");
-    const p = new Peer();
+    const p = new Peer(uuidv4()); // Use UUID for unique peer ID
+    setPeerId(p.id);
+    const url = `${window.location.origin}${window.location.pathname}?peer=${p.id}`;
+    setSessionUrl(url);
+
     setPeer(p);
     p.on("open", (id) => {
       setPeerId(id);

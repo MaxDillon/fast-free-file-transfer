@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "peerjs": "^1.5.5",
-    "solid-js": "^1.9.7"
+    "solid-js": "^1.9.7",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.16",
