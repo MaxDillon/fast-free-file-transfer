@@ -18,8 +18,8 @@ function App() {
   const [message, setMessage] = createSignal('');
   const [receivedMessages, setReceivedMessages] = createSignal<string[]>([]);
   const [sessionUrl, setSessionUrl] = createSignal('');
-  const [isSender, setIsSender] = createSignal(false);
-  const [sessionReady, setSessionReady] = createSignal(false);
+  const [_isSender, setIsSender] = createSignal(false);
+  const [_sessionReady, setSessionReady] = createSignal(false);
   const [sessionId, setSessionId] = createSignal('');
   const [offerObj, setOfferObj] = createSignal<any>(null);
   const [iceCandidates, setIceCandidates] = createSignal<any[]>([]);
@@ -36,7 +36,7 @@ function App() {
   const [receivedFile, setReceivedFile] = createSignal<{name: string, type: string, blob: Blob}|null>(null);
   const [isSendingFile, setIsSendingFile] = createSignal(false);
   const [isReceivingFile, setIsReceivingFile] = createSignal(false);
-  const [receiveBuffer, setReceiveBuffer] = createSignal<Uint8Array[]>([]);
+  const [_receiveBuffer, setReceiveBuffer] = createSignal<Uint8Array[]>([]);
   const [expectedFileSize, setExpectedFileSize] = createSignal<number|null>(null);
   const [expectedFileName, setExpectedFileName] = createSignal<string>('');
   const [expectedFileType, setExpectedFileType] = createSignal<string>('');
@@ -79,7 +79,7 @@ function App() {
           finalizeSession(pc);
         }, 1000);
       },
-      onIceConnectionStateChange: (state) => {},
+      onIceConnectionStateChange: (_state) => {},
       onDataChannel: (dc) => {
         setDataChannel(dc);
         setStep('connected');
@@ -95,7 +95,7 @@ function App() {
   };
 
   // Finalize session: encode offer and ICE, generate URL
-  const finalizeSession = (pc: WebRTCConnection) => {
+  const finalizeSession = (_pc: WebRTCConnection) => {
     const offer = offerObj();
     const candidates = iceCandidates();
     const session = encodeSession(offer, candidates);
@@ -126,8 +126,8 @@ function App() {
     try {
       const { sdp, candidates } = decodeSession(sessionId());
       const pc = new WebRTCConnection({
-        onIceCandidate: (candidate) => {},
-        onIceConnectionStateChange: (state) => {},
+        onIceCandidate: (_candidate) => {},
+        onIceConnectionStateChange: (_state) => {},
         onDataChannel: (dc) => {
           setDataChannel(dc);
           setStep('connected');
@@ -185,7 +185,7 @@ function App() {
           const arr = new Uint8Array(e.data);
           setReceivedBytes((bytes) => bytes + arr.length);
           const total = expectedFileSize();
-          if (total) setFileReceiveProgress((bytes) => Math.min(100, Math.round(((receivedBytes() + arr.length) / total) * 100)));
+          if (total) setFileReceiveProgress((_bytes) => Math.min(100, Math.round(((receivedBytes() + arr.length) / total) * 100)));
           // If file complete
           if (total && receivedBytes() + arr.length >= total) {
             const all = [...prev, arr];
