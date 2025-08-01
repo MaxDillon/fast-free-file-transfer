@@ -10,14 +10,15 @@
     "postinstall": "tailwindcss init -p"
   },
   "dependencies": {
+    "peerjs": "^1.5.5",
     "solid-js": "^1.9.7"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
-    "vite-plugin-solid": "^2.11.7",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8.4.38",
-    "autoprefixer": "^10.4.16"
+    "vite-plugin-solid": "^2.11.7"
   }
 }
