@@ -3,19 +3,10 @@ import Peer from "peerjs";
 // For types only:
 type DataConnection = import("peerjs").DataConnection;
 
-function base64urlEncode(str: string) {
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function base64urlDecode(str: string) {
-  str = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (str.length % 4) str += "=";
-  return atob(str);
-}
-
 const CHUNK_SIZE = 16 * 1024; // 16KB per chunk
 
 function App() {
-  const [peer, setPeer] = createSignal<Peer | null>(null);
+  const [_peer, setPeer] = createSignal<Peer | null>(null);
   const [peerId, setPeerId] = createSignal("");
   const [conn, setConn] = createSignal<DataConnection | null>(null);
   const [message, setMessage] = createSignal("");
@@ -23,12 +14,12 @@ function App() {
   const [sessionUrl, setSessionUrl] = createSignal("");
   const [_isSender, setIsSender] = createSignal(false);
   const [_sessionReady, setSessionReady] = createSignal(false);
-  const [sessionId, setSessionId] = createSignal("");
-  const [offerObj, setOfferObj] = createSignal<any>(null);
-  const [iceCandidates, setIceCandidates] = createSignal<any[]>([]);
+  const [_sessionId, _setSessionId] = createSignal("");
+  const [_offerObj, _setOfferObj] = createSignal<any>(null);
+  const [_ceCandidates, _setIceCandidates] = createSignal<any[]>([]);
   const [copySuccess, setCopySuccess] = createSignal("");
-  const [answerCode, setAnswerCode] = createSignal("");
-  const [answerInput, setAnswerInput] = createSignal("");
+  const [_answerCode, _setAnswerCode] = createSignal("");
+  const [_answerInput, _setAnswerInput] = createSignal("");
   const [step, setStep] = createSignal<
     | "init"
     | "share-offer"
