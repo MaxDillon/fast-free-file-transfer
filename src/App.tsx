@@ -50,12 +50,12 @@ function App() {
   const [expectedFileType, setExpectedFileType] = createSignal<string>("");
   const [receivedBytes, setReceivedBytes] = createSignal(0);
 
-  // On mount, check for peer id in URL
+  // On mount, check for peer id in URL (query param)
   createEffect(() => {
-    const hash = window.location.hash;
-    const match = hash.match(/peer=([A-Za-z0-9_-]+)/);
-    if (match) {
-      setPeerId(match[1]);
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("peer");
+    if (id) {
+      setPeerId(id);
       setIsSender(false);
       setStep("receiver-generate");
     }
@@ -71,7 +71,7 @@ function App() {
     setPeer(p);
     p.on("open", (id) => {
       setPeerId(id);
-      const url = `${window.location.origin}${window.location.pathname}#peer=${id}`;
+      const url = `${window.location.origin}${window.location.pathname}?peer=${id}`;
       setSessionUrl(url);
       setSessionReady(true);
       setStep("share-offer");
