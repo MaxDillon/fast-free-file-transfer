@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import React from "react";
 import type { ReceivedFile } from "../types";
 
 interface FileTransferProps {
@@ -10,91 +10,86 @@ interface FileTransferProps {
   receivedFile: ReceivedFile | null;
   expectedFileName: string;
   expectedFileSize: number | null;
-  handleFileChange: (e: Event) => void;
-  handleDrop: (e: DragEvent) => void;
-  handleDragOver: (e: DragEvent) => void;
+  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  handleDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
   sendFile: () => void;
 }
 
-export default function FileTransfer(props: FileTransferProps) {
+const FileTransfer: React.FC<FileTransferProps> = ({
+  selectedFile,
+  isSendingFile,
+  isReceivingFile,
+  fileSendProgress,
+  fileReceiveProgress,
+  receivedFile,
+  expectedFileName,
+  expectedFileSize,
+  handleFileChange,
+  handleDrop,
+  handleDragOver,
+  sendFile,
+}) => {
   return (
-    <div class="flex flex-col gap-2 items-center">
+    <div className="flex flex-col gap-4">
       <div
-        class="w-full border-2 border-dashed border-gray-300 rounded p-4 flex flex-col items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition"
-        onDrop={props.handleDrop}
-        onDragOver={props.handleDragOver}
+        className="border-2 border-dashed rounded p-4 text-center cursor-pointer bg-gray-50 hover:bg-gray-100"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
       >
         <input
           type="file"
-          class="hidden"
-          id="fileInput"
-          onChange={props.handleFileChange}
+          className="hidden"
+          id="file-input"
+          onChange={handleFileChange}
         />
-        <label
-          for="fileInput"
-          class="cursor-pointer text-blue-600 font-semibold"
-        >
-          Click or drag and drop a file to send
+        <label htmlFor="file-input" className="cursor-pointer block">
+          {selectedFile ? (
+            <span className="font-medium">Selected: {selectedFile.name}</span>
+          ) : (
+            <span className="text-gray-500">
+              Drag & drop or click to select a file
+            </span>
+          )}
         </label>
-        <Show when={props.selectedFile}>
-          <div class="mt-2 text-xs text-gray-700">
-            Selected: {props.selectedFile ? props.selectedFile.name : ""} (
-            {props.selectedFile
-              ? Math.round(props.selectedFile.size / 1024)
-              : 0}{" "}
-            KB)
-          </div>
-        </Show>
       </div>
       <button
-        class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition disabled:opacity-50"
-        onClick={props.sendFile}
-        disabled={!props.selectedFile || props.isSendingFile}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        onClick={sendFile}
+        disabled={!selectedFile || isSendingFile || isReceivingFile}
       >
-        {props.isSendingFile
-          ? `Sending... (${props.fileSendProgress}%)`
-          : "Upload & Send File"}
+        {isSendingFile ? "Sending..." : "Send File"}
       </button>
-      <Show when={props.isSendingFile}>
-        <div class="w-full bg-gray-200 rounded h-2 mt-2">
+      {isSendingFile && (
+        <div className="w-full bg-gray-200 rounded h-3">
           <div
-            class="bg-blue-500 h-2 rounded"
-            style={{ width: `${props.fileSendProgress}%` }}
+            className="bg-blue-500 h-3 rounded"
+            style={{ width: `${fileSendProgress}%` }}
           ></div>
         </div>
-      </Show>
-      <Show when={props.isReceivingFile}>
-        <div class="w-full mt-2">
-          <div class="text-xs text-gray-700">
-            Receiving: {props.expectedFileName} (
-            {Math.round((props.expectedFileSize || 0) / 1024)} KB)
-          </div>
-          <div class="w-full bg-gray-200 rounded h-2 mt-1">
-            <div
-              class="bg-green-500 h-2 rounded"
-              style={{ width: `${props.fileReceiveProgress}%` }}
-            ></div>
-          </div>
+      )}
+      {isReceivingFile && expectedFileName && expectedFileSize && (
+        <div className="w-full bg-gray-200 rounded h-3">
+          <div
+            className="bg-green-500 h-3 rounded"
+            style={{ width: `${fileReceiveProgress}%` }}
+          ></div>
         </div>
-      </Show>
-      <Show when={props.receivedFile}>
-        <div class="w-full mt-4 flex flex-col items-center">
-          <div class="text-xs text-gray-700 mb-1">
-            Received file: {props.receivedFile ? props.receivedFile.name : ""}
-          </div>
+      )}
+      {receivedFile && (
+        <div className="flex flex-col items-center gap-2">
+          <span className="font-medium">Received: {receivedFile.name}</span>
           <a
-            href={
-              props.receivedFile
-                ? URL.createObjectURL(props.receivedFile.blob)
-                : "#"
-            }
-            download={props.receivedFile ? props.receivedFile.name : ""}
-            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded transition"
+            href={URL.createObjectURL(receivedFile.blob)}
+            download={receivedFile.name}
+            className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
           >
-            Download File
+            Download
           </a>
         </div>
-      </Show>
+      )}
     </div>
   );
-}
+};
+
+export default FileTransfer;

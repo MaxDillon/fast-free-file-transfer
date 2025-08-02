@@ -1,14 +1,20 @@
-import { defineConfig } from 'vite';
-import solid from 'vite-plugin-solid';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig(({ command }) => {
-  const isProd = command === 'build';
+  const isProd = command === "build";
 
   return {
-    base: isProd ? '/fast-free-file-transfer/' : '/',
-    plugins: [solid()],
+    base: isProd ? "/fast-free-file-transfer/" : "/",
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
+      },
+    },
     server: {
-      allowedHosts: ['laptop.kinkajou-richter.ts.net'],
+      allowedHosts: ["laptop.kinkajou-richter.ts.net"],
     },
   };
 });

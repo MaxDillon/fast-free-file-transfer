@@ -1,41 +1,54 @@
+import React from "react";
+
 interface MessagePanelProps {
   message: string;
-  setMessage: (v: string) => void;
+  setMessage: React.Dispatch<React.SetStateAction<string>>;
   sendMessage: () => void;
   receivedMessages: string[];
 }
 
-export default function MessagePanel(props: MessagePanelProps) {
-  const handleSubmit = (e: Event) => {
-    e.preventDefault();
-    props.sendMessage();
+const MessagePanel: React.FC<MessagePanelProps> = ({
+  message,
+  setMessage,
+  sendMessage,
+  receivedMessages,
+}) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessage(e.target.value);
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
   };
   return (
-    <>
-      <h2 class="text-lg font-semibold">Data Channel Communication</h2>
-      <form class="flex gap-2 items-center" onSubmit={handleSubmit}>
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
         <input
+          className="border px-2 py-1 rounded w-full"
           type="text"
-          class="flex-1 border rounded p-2"
-          value={props.message}
-          onInput={(e) => props.setMessage(e.currentTarget.value)}
           placeholder="Type a message"
+          value={message}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
         />
         <button
-          type="submit"
-          class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded transition"
+          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+          onClick={sendMessage}
+          disabled={!message}
         >
-          Send Message
+          Send
         </button>
-      </form>
-      <div>
-        <h3 class="font-semibold mt-4 mb-2">Received Messages:</h3>
-        <ul class="bg-gray-100 rounded p-2 min-h-[40px]">
-          {props.receivedMessages.map((msg) => (
-            <li class="text-xs font-mono py-0.5">{msg}</li>
-          ))}
-        </ul>
       </div>
-    </>
+      <div className="bg-gray-100 rounded p-2 h-32 overflow-y-auto text-sm">
+        {receivedMessages.length === 0 ? (
+          <span className="text-gray-400">No messages yet.</span>
+        ) : (
+          receivedMessages.map((msg, i) => <div key={i}>{msg}</div>)
+        )}
+      </div>
+    </div>
   );
-}
+};
+
+export default MessagePanel;

@@ -1,6 +1,10 @@
-/* @refresh reload */
-import { render } from 'solid-js/web';
-import App from './App';
-import './index.css'; // Tailwind CSS entry point
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./index.css";
 
-render(() => <App />, document.getElementById('root') as HTMLElement);
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
