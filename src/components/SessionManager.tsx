@@ -10,6 +10,7 @@ interface SessionManagerProps {
   onConnect: (peerId: string) => void;
   targetPeerId: string;
   setTargetPeerId: (id: string) => void;
+  onDismissError?: () => void;
 }
 
 const SessionManager: React.FC<SessionManagerProps> = ({
@@ -22,6 +23,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({
   onConnect,
   targetPeerId,
   setTargetPeerId,
+  onDismissError,
 }) => {
   // Automatically start a session on mount if not already started
   useEffect(() => {
@@ -55,8 +57,29 @@ const SessionManager: React.FC<SessionManagerProps> = ({
   return (
     <div className="flex flex-col gap-4">
       {error && (
-        <div className="bg-red-100 text-red-700 p-2 rounded text-center">
-          {error}
+        <div className="relative bg-red-100 text-red-700 p-2 rounded text-center flex items-center justify-center">
+          <span className="flex-1">{error}</span>
+          {onDismissError && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-red-700 hover:text-red-900 focus:outline-none"
+              onClick={onDismissError}
+              title="Dismiss error"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
         </div>
       )}
       {/* Connection controls always visible */}
@@ -99,13 +122,25 @@ const SessionManager: React.FC<SessionManagerProps> = ({
                 setInputError("");
               }
             }}
+            disabled={step === "connecting"}
           />
           <button
-            className="bg-blue-600 dark:bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors"
+            className={
+              "relative bg-blue-600 dark:bg-blue-700 text-white px-3 py-1 rounded hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors flex items-center justify-center min-w-[90px] min-h-[36px]" +
+              (step === "connecting" ? " opacity-60 cursor-not-allowed" : "")
+            }
             onClick={() => onConnect(targetPeerId)}
-            disabled={!targetPeerId || !!inputError}
+            disabled={!targetPeerId || !!inputError || step === "connecting"}
           >
-            Connect
+            {step === "connecting" ? (
+              <span className="flex items-center justify-center w-full h-[22px]">
+                <span className="inline-block w-5 h-5 border-2 border-white border-t-blue-400 dark:border-t-blue-300 border-t-2 rounded-full animate-spin"></span>
+              </span>
+            ) : (
+              <span className="inline-block h-[22px] leading-[22px]">
+                Connect
+              </span>
+            )}
           </button>
         </div>
         {inputError && (

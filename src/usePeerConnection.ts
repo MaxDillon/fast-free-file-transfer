@@ -183,11 +183,44 @@ export function usePeerConnection(): UsePeerConnection {
         if (!peer) return;
         const connection = peer.connect(targetPeerId);
         setConnections((prev) => ({ ...prev, [targetPeerId]: connection }));
+        let finished = false;
+        const cleanup = () => {
+          finished = true;
+        };
+        // Timeout for connection attempt
+        const timeout = setTimeout(() => {
+          if (!finished) {
+            setError("Failed to connect: Timed out");
+            setStep("receiver-generate");
+            cleanup();
+          }
+        }, 7000);
         connection.on("open", () => {
-          setStep("connected");
+          if (!finished) {
+            setStep("connected");
+            clearTimeout(timeout);
+            cleanup();
+          }
         });
-        connection.on("close", () => console.error("Connection closed"));
-        connection.on("error", () => console.error("Connection error"));
+        connection.on("close", () => {
+          if (!finished) {
+            setError("Failed to connect: Connection closed");
+            setStep("receiver-generate");
+            clearTimeout(timeout);
+            cleanup();
+          }
+        });
+        connection.on("error", (err) => {
+          if (!finished) {
+            setError(
+              "Failed to connect: " +
+                (err instanceof Error ? err.message : String(err))
+            );
+            setStep("receiver-generate");
+            clearTimeout(timeout);
+            cleanup();
+          }
+        });
         connection.on("data", () => console.log("Data received"));
       } catch (err) {
         setError(

@@ -53,12 +53,11 @@ export default function App() {
     >
   >({});
 
+  // Error state
+  const [errorDismissed, setErrorDismissed] = useState(false);
+
   // Tab bar UI
   const tabIds = Object.keys(peer.connections);
-  console.log("[App] peer.connections:", peer.connections);
-  console.log("[App] tabIds:", tabIds);
-  console.log("[App] connStates:", connStates);
-  console.log("[App] activeConnId:", activeConnId);
 
   // When a new connection is added, initialize its state and select it if it's the first
   useEffect(() => {
@@ -220,6 +219,10 @@ export default function App() {
     [peer]
   );
 
+  useEffect(() => {
+    if (peer.error) setErrorDismissed(false);
+  }, [peer.error]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex flex-col items-center py-8 transition-colors">
       <header className="w-full max-w-2xl bg-white dark:bg-zinc-800 rounded-lg shadow p-8 flex flex-col gap-6 transition-colors">
@@ -239,12 +242,13 @@ export default function App() {
           step={peer.step}
           sessionUrl={peer.sessionUrl}
           copySuccess={peer.copySuccess}
-          error={peer.error}
+          error={!errorDismissed ? peer.error : ""}
           onStartSession={peer.startSession}
           onCopy={handleCopy}
           onConnect={peer.handleConnectToPeer}
           targetPeerId={peer.targetPeerId}
           setTargetPeerId={peer.setTargetPeerId}
+          onDismissError={() => setErrorDismissed(true)}
         />
         {tabIds.length > 0 && (
           <div className="flex flex-col w-full">
