@@ -9,7 +9,6 @@ export function usePeerConnection() {
   const [_peer, setPeer] = createSignal<Peer | null>(null);
   const [peerId, setPeerId] = createSignal("");
   const [conn, setConn] = createSignal<DataConnection | null>(null);
-  const [sessionUrl, setSessionUrl] = createSignal("");
   const [step, setStep] = createSignal<Step>("init");
   const [error, setError] = createSignal("");
   const [copySuccess, setCopySuccess] = createSignal("");
@@ -35,14 +34,10 @@ export function usePeerConnection() {
     setError("");
     const p = new Peer(uuidv4()); // Use UUID for unique peer ID
     setPeerId(p.id);
-    const url = `${window.location.origin}${window.location.pathname}?peer=${p.id}`;
-    setSessionUrl(url);
 
     setPeer(p);
     p.on("open", (id) => {
       setPeerId(id);
-      const url = `${window.location.origin}${window.location.pathname}?peer=${id}`;
-      setSessionUrl(url);
       setSessionReady(true);
       setStep("share-offer");
     });
@@ -73,6 +68,12 @@ export function usePeerConnection() {
       );
     }
   };
+
+
+  const sessionUrl = () => {
+    const id = peerId()
+    return `${window.location.origin}${window.location.pathname}?peer=${id}`;  
+  }
 
   return {
     peerId,
