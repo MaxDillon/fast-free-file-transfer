@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from "uuid";
 
 type DataConnection = import("peerjs").DataConnection;
 
+const STORAGE_PEER_ID = "myPeerId";
+const STORAGE_CONNECTED_PEERS = "connectedPeerIds";
+
 type UsePeerConnection = {
   peerId: string;
   sessionUrl: string;
@@ -20,6 +23,7 @@ type UsePeerConnection = {
   sessionReady: boolean;
   targetPeerId: string;
   setTargetPeerId: (id: string) => void;
+  peerInstance: Peer | null; // <-- add this
 };
 
 export function usePeerConnection(): UsePeerConnection {
@@ -35,6 +39,98 @@ export function usePeerConnection(): UsePeerConnection {
   const [sessionReady, setSessionReady] = useState(false);
   const [targetPeerId, setTargetPeerId] = useState("");
 
+  // --- Peer ID persistence ---
+  // On mount, check for stored peerId or generate and persist one
+  useEffect(() => {
+    let storedPeerId = sessionStorage.getItem(STORAGE_PEER_ID);
+    if (!storedPeerId) {
+      storedPeerId = uuidv4();
+      sessionStorage.setItem(STORAGE_PEER_ID, storedPeerId);
+    }
+    setPeerId(storedPeerId);
+  }, []);
+
+  // Store our peerId in sessionStorage when set (redundant but safe)
+  useEffect(() => {
+    if (peerId) {
+      sessionStorage.setItem(STORAGE_PEER_ID, peerId);
+    }
+  }, [peerId]);
+
+  // --- Connected peers persistence ---
+  // Store all connected peer IDs in sessionStorage
+  useEffect(() => {
+    const ids = Object.keys(connections);
+    if (ids.length > 0) {
+      console.log(
+        "[usePeerConnection] Saving connected peer IDs to sessionStorage:",
+        ids
+      );
+      sessionStorage.setItem(STORAGE_CONNECTED_PEERS, JSON.stringify(ids));
+    } else {
+      console.log(
+        "[usePeerConnection] Not saving to sessionStorage: no connections."
+      );
+    }
+  }, [connections]);
+
+  // On mount, restore and reconnect to all stored peer IDs
+  useEffect(() => {
+    const stored = sessionStorage.getItem(STORAGE_CONNECTED_PEERS);
+    console.log("[usePeerConnection] Loaded from sessionStorage:", stored);
+    if (stored && peer) {
+      try {
+        const ids: string[] = JSON.parse(stored);
+        console.log(
+          "[usePeerConnection] Attempting to reconnect to peer IDs:",
+          ids
+        );
+        ids.forEach((id) => {
+          if (!connections[id]) {
+            console.log(
+              `[usePeerConnection] Attempting to reconnect to peer: ${id}`
+            );
+            try {
+              const connection = peer.connect(id);
+              setConnections((prev) => ({ ...prev, [id]: connection }));
+              connection.on("open", () => {
+                console.log(`[usePeerConnection] Reconnected to peer: ${id}`);
+                setStep("connected");
+              });
+              connection.on("close", () =>
+                console.warn(`[usePeerConnection] Connection closed: ${id}`)
+              );
+              connection.on("error", (err) =>
+                console.error(
+                  `[usePeerConnection] Connection error for ${id}:`,
+                  err
+                )
+              );
+              connection.on("data", () =>
+                console.log(`[usePeerConnection] Data received from ${id}`)
+              );
+            } catch (err) {
+              console.error(
+                `[usePeerConnection] Failed to reconnect to peer: ${id}`,
+                err
+              );
+            }
+          }
+        });
+      } catch (err) {
+        console.error(
+          "[usePeerConnection] Failed to parse stored peer IDs:",
+          err
+        );
+      }
+    } else if (!peer) {
+      console.log(
+        "[usePeerConnection] Peer instance not ready, skipping reconnection."
+      );
+    }
+    // eslint-disable-next-line
+  }, [peer, connections]);
+
   // On mount, check for peer id in URL (query param)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,10 +143,16 @@ export function usePeerConnection(): UsePeerConnection {
     // eslint-disable-next-line
   }, []);
 
-  // Always create a PeerJS peer for the receiver (random id)
+  // Always create a PeerJS peer for the receiver (random id or from storage)
   useEffect(() => {
-    if (step === "receiver-generate" && !peer) {
-      const p = new Peer();
+    if (
+      (step === "receiver-generate" ||
+        step === "share-offer" ||
+        step === "init") &&
+      !peer &&
+      peerId
+    ) {
+      const p = new Peer(peerId);
       setPeer(p);
       p.on("open", (id) => {
         setPeerId(id);
@@ -62,7 +164,7 @@ export function usePeerConnection(): UsePeerConnection {
       });
     }
     // eslint-disable-next-line
-  }, [step]);
+  }, [step, peerId]);
 
   // Sender: Start session, create PeerJS peer, show link
   const startSession = useCallback(async () => {
@@ -70,22 +172,7 @@ export function usePeerConnection(): UsePeerConnection {
     setSessionReady(false);
     setStep("share-offer");
     setError("");
-
-    const uuid = uuidv4();
-    setPeerId(uuid);
-    const p = new Peer(uuid);
-    setPeer(p);
-
-    p.on("open", (id) => {
-      setPeerId(id);
-      setSessionReady(true);
-      setStep("share-offer");
-    });
-    p.on("connection", async (connection) => {
-      setConnections((prev) => ({ ...prev, [connection.peer]: connection }));
-      setStep("connected");
-    });
-    p.on("error", (err) => setError("Peer error: " + err));
+    // Peer will be created by useEffect above
   }, []);
 
   // Receiver: Connect to sender's peer
@@ -130,5 +217,6 @@ export function usePeerConnection(): UsePeerConnection {
     sessionReady,
     targetPeerId,
     setTargetPeerId,
+    peerInstance: peer, // <-- expose the PeerJS instance
   };
 }

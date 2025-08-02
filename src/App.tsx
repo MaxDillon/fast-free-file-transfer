@@ -4,6 +4,7 @@ import SessionManager from "./components/SessionManager";
 import FileTransfer from "./components/FileTransfer";
 import MessagePanel from "./components/MessagePanel";
 import type { ReceivedFile } from "./types";
+import { FiCopy, FiTrash2, FiRefreshCw } from "react-icons/fi";
 
 const CHUNK_SIZE = 16 * 1024;
 
@@ -36,14 +37,24 @@ export default function App() {
 
   // Tab bar UI
   const tabIds = Object.keys(peer.connections);
+  console.log("[App] peer.connections:", peer.connections);
+  console.log("[App] tabIds:", tabIds);
+  console.log("[App] connStates:", connStates);
+  console.log("[App] activeConnId:", activeConnId);
 
   // When a new connection is added, initialize its state and select it if it's the first
   useEffect(() => {
     if (tabIds.length > 0) {
-      setConnStates((prev) => {
-        const next = { ...prev };
-        tabIds.forEach((id) => {
-          if (!next[id]) {
+      // Only add state for new connections
+      const missingIds = tabIds.filter((id) => !(id in connStates));
+      if (missingIds.length > 0) {
+        console.log(
+          "[App] Initializing state for new connections:",
+          missingIds
+        );
+        setConnStates((prev) => {
+          const next = { ...prev };
+          missingIds.forEach((id) => {
             next[id] = {
               selectedFile: null,
               fileSendProgress: 0,
@@ -58,13 +69,16 @@ export default function App() {
               message: "",
               receivedMessages: [],
             };
-          }
+          });
+          return next;
         });
-        return next;
-      });
-      if (!activeConnId) setActiveConnId(tabIds[0]);
+      }
+      if (!activeConnId) {
+        console.log("[App] Setting activeConnId to first tab:", tabIds[0]);
+        setActiveConnId(tabIds[0]);
+      }
     }
-  }, [tabIds]);
+  }, [tabIds, connStates, activeConnId]);
 
   // Data connection setup for file and message transfer (per connection)
   useEffect(() => {
@@ -74,6 +88,7 @@ export default function App() {
       // Only set up once per connection
       if ((connection as any)._handlersSet) return;
       (connection as any)._handlersSet = true;
+      console.log(`[App] Setting up handlers for connection: ${id}`);
       connection.on("data", (data: any) => {
         if (typeof data === "string") {
           try {
@@ -161,9 +176,16 @@ export default function App() {
           });
         }
       });
-      connection.on("error", (err: any) =>
-        peer.setError("Connection error: " + err)
-      );
+      connection.on("error", (err: any) => {
+        console.error(`[App] Connection error for ${id}:`, err);
+        peer.setError("Connection error: " + err);
+      });
+      connection.on("close", () => {
+        console.log(`[App] Connection closed: ${id}`);
+      });
+      connection.on("open", () => {
+        console.log(`[App] Connection open: ${id}`);
+      });
     });
     // eslint-disable-next-line
   }, [tabIds, peer.connections]);
@@ -277,26 +299,96 @@ export default function App() {
         {tabIds.length > 0 && (
           <div className="flex flex-col w-full">
             <div className="flex border-b mb-4">
-              {tabIds.map((id) => (
+              {tabIds.map((id) => {
+                const connection = peer.connections[id];
+                const isOpen = connection && connection.open === true;
+                return (
+                  <button
+                    key={id}
+                    title={id}
+                    className={`px-4 py-2 -mb-px border-b-2 truncate max-w-[10rem] ${
+                      activeConnId === id
+                        ? "border-blue-600 text-blue-600 bg-white"
+                        : isOpen
+                        ? "border-transparent text-gray-500 bg-gray-100"
+                        : "border-transparent text-gray-400 bg-gray-50 opacity-60"
+                    }`}
+                    onClick={() => setActiveConnId(id)}
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {id.slice(0, 8)}...
+                  </button>
+                );
+              })}
+            </div>
+            {/* Tab action buttons inside active tab window */}
+            {activeConnId && connStates[activeConnId] && (
+              <div className="flex flex-row gap-2 mb-4 items-center self-end">
                 <button
-                  key={id}
-                  title={id}
-                  className={`px-4 py-2 -mb-px border-b-2 truncate max-w-[10rem] ${
-                    activeConnId === id
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500"
-                  }`}
-                  onClick={() => setActiveConnId(id)}
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                  className="p-2 rounded hover:bg-gray-200"
+                  title="Copy ID"
+                  onClick={() => handleCopy(activeConnId)}
+                >
+                  <FiCopy size={18} />
+                </button>
+                <button
+                  className="p-2 rounded hover:bg-red-100 text-red-600"
+                  title="Delete Tab"
+                  onClick={() => {
+                    const connection = peer.connections[activeConnId];
+                    if (connection && connection.open) connection.close();
+                    setConnStates((prev) => {
+                      const next = { ...prev };
+                      delete next[activeConnId];
+                      return next;
+                    });
+                    // Remove from peer.connections
+                    delete peer.connections[activeConnId];
+                    // Remove from sessionStorage
+                    const stored = sessionStorage.getItem("connectedPeerIds");
+                    if (stored) {
+                      try {
+                        const arr = JSON.parse(stored).filter(
+                          (pid: string) => pid !== activeConnId
+                        );
+                        sessionStorage.setItem(
+                          "connectedPeerIds",
+                          JSON.stringify(arr)
+                        );
+                      } catch {}
+                    }
+                    // Switch to another tab if needed
+                    const others = tabIds.filter((tid) => tid !== activeConnId);
+                    setActiveConnId(others[0] || null);
                   }}
                 >
-                  {id.slice(0, 8)}...
+                  <FiTrash2 size={18} />
                 </button>
-              ))}
-            </div>
+                {peer.peerInstance &&
+                  peer.connections[activeConnId] &&
+                  peer.connections[activeConnId].open !== true && (
+                    <button
+                      className="p-2 rounded hover:bg-green-100 text-green-600"
+                      title="Reload Connection"
+                      onClick={() => {
+                        const newConn =
+                          peer.peerInstance!.connect(activeConnId);
+                        peer.connections[activeConnId] = newConn;
+                        setConnStates((prev) => ({ ...prev })); // force rerender
+                        newConn.on("open", () => {
+                          setConnStates((prev) => ({ ...prev }));
+                        });
+                      }}
+                    >
+                      <FiRefreshCw size={18} />
+                    </button>
+                  )}
+              </div>
+            )}
             {activeConnId && connStates[activeConnId] && (
               <div className="flex flex-col gap-6">
                 <FileTransfer

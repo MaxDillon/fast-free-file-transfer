@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 interface SessionManagerProps {
   step: string;
@@ -31,6 +31,27 @@ const SessionManager: React.FC<SessionManagerProps> = ({
     // eslint-disable-next-line
   }, [step]);
 
+  // Store the last connected peer UUID in sessionStorage
+  useEffect(() => {
+    if (step === "connected" && targetPeerId) {
+      sessionStorage.setItem("lastConnectedPeerId", targetPeerId);
+    }
+  }, [step, targetPeerId]);
+
+  // On mount, if not already set, restore the peer id from sessionStorage
+  useEffect(() => {
+    if (!targetPeerId) {
+      const last = sessionStorage.getItem("lastConnectedPeerId");
+      if (last) setTargetPeerId(last);
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  // UUID v4 regex
+  const uuidV4Regex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const [inputError, setInputError] = useState("");
+
   return (
     <div className="flex flex-col gap-4">
       {error && (
@@ -58,19 +79,32 @@ const SessionManager: React.FC<SessionManagerProps> = ({
         <div className="flex items-center gap-2 mt-2">
           <span className="text-gray-500">or</span>
           <input
-            className="border px-2 py-1 rounded"
+            className={`border px-2 py-1 rounded ${
+              inputError ? "border-red-400" : ""
+            }`}
             placeholder="Enter peer ID"
             value={targetPeerId}
-            onChange={(e) => setTargetPeerId(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setTargetPeerId(val);
+              if (val && !uuidV4Regex.test(val)) {
+                setInputError("Invalid UUID format");
+              } else {
+                setInputError("");
+              }
+            }}
           />
           <button
             className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
             onClick={() => onConnect(targetPeerId)}
-            disabled={!targetPeerId}
+            disabled={!targetPeerId || !!inputError}
           >
             Connect
           </button>
         </div>
+        {inputError && (
+          <div className="text-red-500 text-xs mt-1">{inputError}</div>
+        )}
       </div>
       {step === "connected" && (
         <div className="text-green-700 text-center font-semibold">
