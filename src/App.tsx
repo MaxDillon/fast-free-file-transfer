@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePeerConnection } from "./usePeerConnection";
 import SessionManager from "./components/SessionManager";
 import FileTransfer from "./components/FileTransfer";
 import MessagePanel from "./components/MessagePanel";
 import type { ReceivedFile } from "./types";
 import { FiCopy, FiTrash2, FiRefreshCw } from "react-icons/fi";
-
-const CHUNK_SIZE = 16 * 1024;
 
 export default function App() {
   // Peer connection/session state
@@ -48,10 +46,6 @@ export default function App() {
       // Only add state for new connections
       const missingIds = tabIds.filter((id) => !(id in connStates));
       if (missingIds.length > 0) {
-        console.log(
-          "[App] Initializing state for new connections:",
-          missingIds
-        );
         setConnStates((prev) => {
           const next = { ...prev };
           missingIds.forEach((id) => {
@@ -73,44 +67,44 @@ export default function App() {
           return next;
         });
       }
-      if (!activeConnId) {
-        console.log("[App] Setting activeConnId to first tab:", tabIds[0]);
-        setActiveConnId(tabIds[0]);
-      }
+      if (!activeConnId) setActiveConnId(tabIds[0]);
     }
-  }, [tabIds, connStates, activeConnId]);
+  }, [tabIds]);
 
   // Data connection setup for file and message transfer (per connection)
   useEffect(() => {
     tabIds.forEach((id) => {
       const connection = peer.connections[id];
       if (!connection) return;
-      // Only set up once per connection
       if ((connection as any)._handlersSet) return;
       (connection as any)._handlersSet = true;
-      console.log(`[App] Setting up handlers for connection: ${id}`);
-      connection.on("data", (data: any) => {
+      connection.on("data", async (data: any) => {
+        // Handle file transfer (single message, not chunked)
+        if (data && data.file && data.filename && data.filetype) {
+          // If file is sent as ArrayBuffer, reconstruct Blob
+          const blob = new Blob([data.file], { type: data.filetype });
+          setConnStates((prev) => ({
+            ...prev,
+            [id]: {
+              ...prev[id],
+              receivedFile: {
+                name: data.filename,
+                type: data.filetype,
+                blob,
+              },
+              isReceivingFile: false,
+              fileReceiveProgress: 100,
+            },
+          }));
+          return;
+        }
+        // Handle file metadata (legacy chunked logic, can be removed if not needed)
         if (typeof data === "string") {
           try {
             const obj = JSON.parse(data);
             if (obj.type === "reject" && obj.reason) {
               peer.setError(obj.reason);
               connection.close();
-              return;
-            }
-            if (obj.__fileMeta) {
-              setConnStates((prev) => ({
-                ...prev,
-                [id]: {
-                  ...prev[id],
-                  isReceivingFile: true,
-                  expectedFileSize: obj.size,
-                  expectedFileName: obj.name,
-                  expectedFileType: obj.type,
-                  receivedBytes: 0,
-                  fileReceiveProgress: 0,
-                },
-              }));
               return;
             }
           } catch {}
@@ -121,59 +115,6 @@ export default function App() {
               receivedMessages: [...prev[id].receivedMessages, data],
             },
           }));
-        } else if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
-          setConnStates((prev) => {
-            const arr =
-              data instanceof Uint8Array ? data : new Uint8Array(data);
-            const newReceivedBytes = prev[id].receivedBytes + arr.length;
-            const total = prev[id].expectedFileSize;
-            let fileReceiveProgress = prev[id].fileReceiveProgress;
-            let isReceivingFile = prev[id].isReceivingFile;
-            let receivedFile = prev[id].receivedFile;
-            let expectedFileSize = prev[id].expectedFileSize;
-            let expectedFileName = prev[id].expectedFileName;
-            let expectedFileType = prev[id].expectedFileType;
-            if (total)
-              fileReceiveProgress = Math.min(
-                100,
-                Math.round((newReceivedBytes / total) * 100)
-              );
-            // If file complete
-            if (total && newReceivedBytes >= total) {
-              const blob = new Blob([arr], { type: expectedFileType });
-              receivedFile = {
-                name: expectedFileName,
-                type: expectedFileType,
-                blob,
-              };
-              isReceivingFile = false;
-              fileReceiveProgress = 100;
-              expectedFileSize = null;
-              expectedFileName = "";
-              expectedFileType = "";
-              return {
-                ...prev,
-                [id]: {
-                  ...prev[id],
-                  receivedBytes: 0,
-                  fileReceiveProgress,
-                  isReceivingFile,
-                  receivedFile,
-                  expectedFileSize,
-                  expectedFileName,
-                  expectedFileType,
-                },
-              };
-            }
-            return {
-              ...prev,
-              [id]: {
-                ...prev[id],
-                receivedBytes: newReceivedBytes,
-                fileReceiveProgress,
-              },
-            };
-          });
         }
       });
       connection.on("error", (err: any) => {
@@ -190,7 +131,7 @@ export default function App() {
     // eslint-disable-next-line
   }, [tabIds, peer.connections]);
 
-  // File sending logic (per connection)
+  // File sending logic (per connection, single message)
   const sendFile = useCallback(
     async (connId: string) => {
       const file = connStates[connId]?.selectedFile;
@@ -203,33 +144,13 @@ export default function App() {
         ...prev,
         [connId]: { ...prev[connId], isSendingFile: true, fileSendProgress: 0 },
       }));
-      connection.send(
-        JSON.stringify({
-          __fileMeta: true,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-        })
-      );
-      let offset = 0;
-      while (offset < file.size) {
-        const chunk = await file
-          .slice(offset, offset + CHUNK_SIZE)
-          .arrayBuffer();
-        connection.send(chunk);
-        offset += CHUNK_SIZE;
-        setConnStates((prev) => ({
-          ...prev,
-          [connId]: {
-            ...prev[connId],
-            fileSendProgress: Math.min(
-              100,
-              Math.round((offset / file.size) * 100)
-            ),
-          },
-        }));
-        await new Promise((r) => setTimeout(r, 0));
-      }
+      // Read file as ArrayBuffer and send as a single message
+      const arrayBuffer = await file.arrayBuffer();
+      connection.send({
+        file: arrayBuffer,
+        filename: file.name,
+        filetype: file.type,
+      });
       setConnStates((prev) => ({
         ...prev,
         [connId]: {
