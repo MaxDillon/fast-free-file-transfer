@@ -223,6 +223,8 @@ export default function App() {
     if (peer.error) setErrorDismissed(false);
   }, [peer.error]);
 
+  const [refreshingConnId, setRefreshingConnId] = useState<string | null>(null);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex flex-col items-center py-8 transition-colors">
       <header className="w-full max-w-2xl bg-white dark:bg-zinc-800 rounded-lg shadow p-8 flex flex-col gap-6 transition-colors">
@@ -328,19 +330,36 @@ export default function App() {
                   peer.connections[activeConnId].open !== true && (
                     <button
                       // Previous: bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700
-                      className="p-2 rounded bg-white dark:bg-zinc-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-600 transition-colors"
+                      className="p-2 rounded bg-white dark:bg-zinc-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-600 transition-colors relative"
                       title="Reload Connection"
-                      onClick={() => {
+                      onClick={async () => {
+                        setRefreshingConnId(activeConnId);
                         const newConn =
                           peer.peerInstance!.connect(activeConnId);
                         peer.connections[activeConnId] = newConn;
                         setConnStates((prev) => ({ ...prev })); // force rerender
-                        newConn.on("open", () => {
-                          setConnStates((prev) => ({ ...prev }));
+                        await new Promise<void>((resolve) => {
+                          newConn.on("open", () => {
+                            setConnStates((prev) => ({ ...prev }));
+                            setRefreshingConnId(null);
+                            resolve();
+                          });
+                          newConn.on("error", () => {
+                            setRefreshingConnId(null);
+                            resolve();
+                          });
                         });
                       }}
+                      disabled={refreshingConnId === activeConnId}
                     >
-                      <FiRefreshCw size={18} />
+                      <FiRefreshCw
+                        size={18}
+                        className={
+                          refreshingConnId === activeConnId
+                            ? "animate-spin"
+                            : ""
+                        }
+                      />
                     </button>
                   )}
               </div>
