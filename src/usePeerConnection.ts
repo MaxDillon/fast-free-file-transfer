@@ -152,7 +152,18 @@ export function usePeerConnection(): UsePeerConnection {
       !peer &&
       peerId
     ) {
-      const p = new Peer(peerId);
+      const p = new Peer(peerId, {
+        config: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            {
+              url: "turn:turn.anyfirewall.com:443?transport=tcp",
+              credential: "webrtc",
+              username: "webrtc",
+            },
+          ],
+        },
+      });
       setPeer(p);
       p.on("open", (id) => {
         setPeerId(id);
