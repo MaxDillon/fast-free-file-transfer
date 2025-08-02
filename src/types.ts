@@ -19,7 +19,8 @@ export type Step =
   | "paste-answer"
   | "receiver-generate"
   | "receiver-share"
-  | "connected";
+  | "connected"
+  | "connecting";
 
 export type PeerConnectionState = {
   peerId: string;

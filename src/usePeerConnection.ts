@@ -32,10 +32,12 @@ export function usePeerConnection() {
     setSessionReady(false);
     setStep("share-offer");
     setError("");
-    const p = new Peer(uuidv4()); // Use UUID for unique peer ID
-    setPeerId(p.id);
 
+    const uuid = uuidv4();
+    setPeerId(uuid);
+    const p = new Peer(uuid);
     setPeer(p);
+
     p.on("open", (id) => {
       setPeerId(id);
       setSessionReady(true);
@@ -50,6 +52,7 @@ export function usePeerConnection() {
 
   // Receiver: Connect to sender's peer
   const handleConnectToPeer = async () => {
+    setStep("connecting");
     try {
       const p = new Peer();
       setPeer(p);
@@ -60,20 +63,21 @@ export function usePeerConnection() {
           setStep("connected");
         });
       });
-      p.on("error", (err) => setError("Peer error: " + err));
+      p.on("error", (err) => {
+        setError("Peer error: " + err);
+        setStep("receiver-generate");
+      });
     } catch (err) {
       setError(
         "Failed to connect: " +
           (err instanceof Error ? err.message : String(err))
       );
+      setStep("receiver-generate");
     }
   };
 
-
-  const sessionUrl = () => {
-    const id = peerId()
-    return `${window.location.origin}${window.location.pathname}?peer=${id}`;  
-  }
+  const sessionUrl = () =>
+    `${window.location.origin}${window.location.pathname}?peer=${peerId()}`;
 
   return {
     peerId,
