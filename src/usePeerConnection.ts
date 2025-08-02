@@ -11,9 +11,7 @@ type UsePeerConnection = {
   step: Step;
   error: string;
   copySuccess: string;
-  conn: DataConnection | null;
-  setConn: (c: DataConnection | null) => void;
-  setStep: (s: Step) => void;
+  connections: Record<string, DataConnection>;
   setError: (e: string) => void;
   setCopySuccess: (s: string) => void;
   startSession: () => Promise<void>;
@@ -27,7 +25,9 @@ type UsePeerConnection = {
 export function usePeerConnection(): UsePeerConnection {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [peerId, setPeerId] = useState("");
-  const [conn, setConn] = useState<DataConnection | null>(null);
+  const [connections, setConnections] = useState<
+    Record<string, DataConnection>
+  >({});
   const [step, setStep] = useState<Step>("init");
   const [error, setError] = useState("");
   const [copySuccess, setCopySuccess] = useState("");
@@ -56,6 +56,10 @@ export function usePeerConnection(): UsePeerConnection {
         setPeerId(id);
       });
       p.on("error", (err) => setError("Peer error: " + err));
+      p.on("connection", (connection) => {
+        setConnections((prev) => ({ ...prev, [connection.peer]: connection }));
+        setStep("connected");
+      });
     }
     // eslint-disable-next-line
   }, [step]);
@@ -78,20 +82,11 @@ export function usePeerConnection(): UsePeerConnection {
       setStep("share-offer");
     });
     p.on("connection", async (connection) => {
-      if (conn) {
-        console.warn("Connection already exists, rejecting new connection.");
-        await connection.send({
-          type: "reject",
-          reason: "This connection has been taken.",
-        });
-        connection.close();
-        return;
-      }
-      setConn(connection);
+      setConnections((prev) => ({ ...prev, [connection.peer]: connection }));
       setStep("connected");
     });
     p.on("error", (err) => setError("Peer error: " + err));
-  }, [conn]);
+  }, []);
 
   // Receiver: Connect to sender's peer
   const handleConnectToPeer = useCallback(
@@ -100,7 +95,7 @@ export function usePeerConnection(): UsePeerConnection {
       try {
         if (!peer) return;
         const connection = peer.connect(targetPeerId);
-        setConn(connection);
+        setConnections((prev) => ({ ...prev, [targetPeerId]: connection }));
         connection.on("open", () => {
           setStep("connected");
         });
@@ -126,9 +121,7 @@ export function usePeerConnection(): UsePeerConnection {
     step,
     error,
     copySuccess,
-    conn,
-    setConn,
-    setStep,
+    connections,
     setError,
     setCopySuccess,
     startSession,

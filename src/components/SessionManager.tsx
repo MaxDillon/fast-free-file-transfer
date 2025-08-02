@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 interface SessionManagerProps {
   step: string;
@@ -23,6 +23,14 @@ const SessionManager: React.FC<SessionManagerProps> = ({
   targetPeerId,
   setTargetPeerId,
 }) => {
+  // Automatically start a session on mount if not already started
+  useEffect(() => {
+    if (step === "init") {
+      onStartSession();
+    }
+    // eslint-disable-next-line
+  }, [step]);
+
   return (
     <div className="flex flex-col gap-4">
       {error && (
@@ -30,51 +38,40 @@ const SessionManager: React.FC<SessionManagerProps> = ({
           {error}
         </div>
       )}
-      {step === "init" && (
-        <button
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          onClick={onStartSession}
-        >
-          Start New Session
-        </button>
-      )}
-      {(step === "waiting" ||
-        step === "share-offer" ||
-        step === "receiver-generate") && (
-        <div className="flex flex-col gap-2 items-center">
-          <div className="text-gray-700">Share this link to connect:</div>
-          <div className="flex gap-2 items-center">
-            <input
-              className="border px-2 py-1 rounded w-full"
-              value={sessionUrl}
-              readOnly
-            />
-            <button
-              className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-              onClick={() => onCopy(sessionUrl)}
-            >
-              Copy
-            </button>
-          </div>
-          {copySuccess && <span className="text-green-600">{copySuccess}</span>}
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-gray-500">or</span>
-            <input
-              className="border px-2 py-1 rounded"
-              placeholder="Enter peer ID"
-              value={targetPeerId}
-              onChange={(e) => setTargetPeerId(e.target.value)}
-            />
-            <button
-              className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-              onClick={() => onConnect(targetPeerId)}
-              disabled={!targetPeerId}
-            >
-              Connect
-            </button>
-          </div>
+      {/* Connection controls always visible */}
+      <div className="flex flex-col gap-2 items-center">
+        <div className="text-gray-700">Share this link to connect:</div>
+        <div className="flex gap-2 items-center">
+          <input
+            className="border px-2 py-1 rounded w-full"
+            value={sessionUrl}
+            readOnly
+          />
+          <button
+            className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
+            onClick={() => onCopy(sessionUrl)}
+          >
+            Copy
+          </button>
         </div>
-      )}
+        {copySuccess && <span className="text-green-600">{copySuccess}</span>}
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-gray-500">or</span>
+          <input
+            className="border px-2 py-1 rounded"
+            placeholder="Enter peer ID"
+            value={targetPeerId}
+            onChange={(e) => setTargetPeerId(e.target.value)}
+          />
+          <button
+            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+            onClick={() => onConnect(targetPeerId)}
+            disabled={!targetPeerId}
+          >
+            Connect
+          </button>
+        </div>
+      </div>
       {step === "connected" && (
         <div className="text-green-700 text-center font-semibold">
           Connected!

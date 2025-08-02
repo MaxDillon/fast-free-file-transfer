@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 interface MessagePanelProps {
   message: string;
-  setMessage: React.Dispatch<React.SetStateAction<string>>;
+  setMessage: (msg: string) => void;
   sendMessage: () => void;
   receivedMessages: string[];
 }
@@ -13,6 +13,10 @@ const MessagePanel: React.FC<MessagePanelProps> = ({
   sendMessage,
   receivedMessages,
 }) => {
+  useEffect(() => {
+    // Auto-start session logic here
+  }, []);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
   };

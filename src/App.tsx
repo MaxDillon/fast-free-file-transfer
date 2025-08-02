@@ -11,81 +11,70 @@ export default function App() {
   // Peer connection/session state
   const peer = usePeerConnection();
 
-  // File transfer state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileSendProgress, setFileSendProgress] = useState<number>(0);
-  const [fileReceiveProgress, setFileReceiveProgress] = useState<number>(0);
-  const [receivedFile, setReceivedFile] = useState<ReceivedFile | null>(null);
-  const [isSendingFile, setIsSendingFile] = useState(false);
-  const [isReceivingFile, setIsReceivingFile] = useState(false);
-  const [expectedFileSize, setExpectedFileSize] = useState<number | null>(null);
-  const [expectedFileName, setExpectedFileName] = useState<string>("");
-  const [expectedFileType, setExpectedFileType] = useState<string>("");
-  const [receivedBytes, setReceivedBytes] = useState(0);
-
-  // Message state
-  const [message, setMessage] = useState("");
-  const [receivedMessages, setReceivedMessages] = useState<string[]>([]);
-
-  // File sending logic
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (files && files[0]) {
-        setSelectedFile(files[0]);
+  // Tab state for active connection
+  const [activeConnId, setActiveConnId] = useState<string | null>(null);
+  // Per-connection state
+  const [connStates, setConnStates] = useState<
+    Record<
+      string,
+      {
+        selectedFile: File | null;
+        fileSendProgress: number;
+        fileReceiveProgress: number;
+        receivedFile: ReceivedFile | null;
+        isSendingFile: boolean;
+        isReceivingFile: boolean;
+        expectedFileSize: number | null;
+        expectedFileName: string;
+        expectedFileType: string;
+        receivedBytes: number;
+        message: string;
+        receivedMessages: string[];
       }
-    },
-    []
-  );
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
-    }
-  }, []);
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  }, []);
+    >
+  >({});
 
-  const sendFile = useCallback(async () => {
-    const file = selectedFile;
-    const connection = peer.conn;
-    if (!file || !connection || connection.open !== true) {
-      peer.setError("No file selected or connection not open.");
-      return;
-    }
-    setIsSendingFile(true);
-    setFileSendProgress(0);
-    // Send file meta first
-    connection.send(
-      JSON.stringify({
-        __fileMeta: true,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      })
-    );
-    // Send file in chunks
-    let offset = 0;
-    while (offset < file.size) {
-      const chunk = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
-      connection.send(chunk);
-      offset += CHUNK_SIZE;
-      setFileSendProgress(
-        Math.min(100, Math.round((offset / file.size) * 100))
-      );
-      await new Promise((r) => setTimeout(r, 0)); // Yield to UI
-    }
-    setIsSendingFile(false);
-    setFileSendProgress(100);
-  }, [selectedFile, peer]);
+  // Tab bar UI
+  const tabIds = Object.keys(peer.connections);
 
-  // Data connection setup for file and message transfer
-  const setupDataConnection = useCallback(
-    (connection: any) => {
+  // When a new connection is added, initialize its state and select it if it's the first
+  useEffect(() => {
+    if (tabIds.length > 0) {
+      setConnStates((prev) => {
+        const next = { ...prev };
+        tabIds.forEach((id) => {
+          if (!next[id]) {
+            next[id] = {
+              selectedFile: null,
+              fileSendProgress: 0,
+              fileReceiveProgress: 0,
+              receivedFile: null,
+              isSendingFile: false,
+              isReceivingFile: false,
+              expectedFileSize: null,
+              expectedFileName: "",
+              expectedFileType: "",
+              receivedBytes: 0,
+              message: "",
+              receivedMessages: [],
+            };
+          }
+        });
+        return next;
+      });
+      if (!activeConnId) setActiveConnId(tabIds[0]);
+    }
+  }, [tabIds]);
+
+  // Data connection setup for file and message transfer (per connection)
+  useEffect(() => {
+    tabIds.forEach((id) => {
+      const connection = peer.connections[id];
+      if (!connection) return;
+      // Only set up once per connection
+      if ((connection as any)._handlersSet) return;
+      (connection as any)._handlersSet = true;
       connection.on("data", (data: any) => {
-        console.log("Received data:", data);
-        // Handle rejection message
         if (typeof data === "string") {
           try {
             const obj = JSON.parse(data);
@@ -95,74 +84,165 @@ export default function App() {
               return;
             }
             if (obj.__fileMeta) {
-              setIsReceivingFile(true);
-              setExpectedFileSize(obj.size);
-              setExpectedFileName(obj.name);
-              setExpectedFileType(obj.type);
-              setReceivedBytes(0);
-              setFileReceiveProgress(0);
+              setConnStates((prev) => ({
+                ...prev,
+                [id]: {
+                  ...prev[id],
+                  isReceivingFile: true,
+                  expectedFileSize: obj.size,
+                  expectedFileName: obj.name,
+                  expectedFileType: obj.type,
+                  receivedBytes: 0,
+                  fileReceiveProgress: 0,
+                },
+              }));
               return;
             }
           } catch {}
-          setReceivedMessages((prev) => [...prev, data]);
+          setConnStates((prev) => ({
+            ...prev,
+            [id]: {
+              ...prev[id],
+              receivedMessages: [...prev[id].receivedMessages, data],
+            },
+          }));
         } else if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
-          // Receiving file chunk
-          setReceivedBytes((prev) => {
+          setConnStates((prev) => {
             const arr =
               data instanceof Uint8Array ? data : new Uint8Array(data);
-            const newReceivedBytes = receivedBytes + arr.length;
-            const total = expectedFileSize;
+            const newReceivedBytes = prev[id].receivedBytes + arr.length;
+            const total = prev[id].expectedFileSize;
+            let fileReceiveProgress = prev[id].fileReceiveProgress;
+            let isReceivingFile = prev[id].isReceivingFile;
+            let receivedFile = prev[id].receivedFile;
+            let expectedFileSize = prev[id].expectedFileSize;
+            let expectedFileName = prev[id].expectedFileName;
+            let expectedFileType = prev[id].expectedFileType;
             if (total)
-              setFileReceiveProgress(
-                Math.min(100, Math.round((newReceivedBytes / total) * 100))
+              fileReceiveProgress = Math.min(
+                100,
+                Math.round((newReceivedBytes / total) * 100)
               );
             // If file complete
             if (total && newReceivedBytes >= total) {
               const blob = new Blob([arr], { type: expectedFileType });
-              setReceivedFile({
+              receivedFile = {
                 name: expectedFileName,
                 type: expectedFileType,
                 blob,
-              });
-              setIsReceivingFile(false);
-              setFileReceiveProgress(100);
-              setReceivedBytes(0);
-              setExpectedFileSize(null);
-              setExpectedFileName("");
-              setExpectedFileType("");
-              return 0;
+              };
+              isReceivingFile = false;
+              fileReceiveProgress = 100;
+              expectedFileSize = null;
+              expectedFileName = "";
+              expectedFileType = "";
+              return {
+                ...prev,
+                [id]: {
+                  ...prev[id],
+                  receivedBytes: 0,
+                  fileReceiveProgress,
+                  isReceivingFile,
+                  receivedFile,
+                  expectedFileSize,
+                  expectedFileName,
+                  expectedFileType,
+                },
+              };
             }
-            return newReceivedBytes;
+            return {
+              ...prev,
+              [id]: {
+                ...prev[id],
+                receivedBytes: newReceivedBytes,
+                fileReceiveProgress,
+              },
+            };
           });
         }
       });
       connection.on("error", (err: any) =>
         peer.setError("Connection error: " + err)
       );
+    });
+    // eslint-disable-next-line
+  }, [tabIds, peer.connections]);
+
+  // File sending logic (per connection)
+  const sendFile = useCallback(
+    async (connId: string) => {
+      const file = connStates[connId]?.selectedFile;
+      const connection = peer.connections[connId];
+      if (!file || !connection || connection.open !== true) {
+        peer.setError("No file selected or connection not open.");
+        return;
+      }
+      setConnStates((prev) => ({
+        ...prev,
+        [connId]: { ...prev[connId], isSendingFile: true, fileSendProgress: 0 },
+      }));
+      connection.send(
+        JSON.stringify({
+          __fileMeta: true,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        })
+      );
+      let offset = 0;
+      while (offset < file.size) {
+        const chunk = await file
+          .slice(offset, offset + CHUNK_SIZE)
+          .arrayBuffer();
+        connection.send(chunk);
+        offset += CHUNK_SIZE;
+        setConnStates((prev) => ({
+          ...prev,
+          [connId]: {
+            ...prev[connId],
+            fileSendProgress: Math.min(
+              100,
+              Math.round((offset / file.size) * 100)
+            ),
+          },
+        }));
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      setConnStates((prev) => ({
+        ...prev,
+        [connId]: {
+          ...prev[connId],
+          isSendingFile: false,
+          fileSendProgress: 100,
+        },
+      }));
     },
-    [peer, expectedFileSize, expectedFileName, expectedFileType, receivedBytes]
+    [connStates, peer.connections]
   );
 
-  // Attach data connection setup when connection is established
-  useEffect(() => {
-    const connection = peer.conn;
-    if (connection) {
-      setupDataConnection(connection);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [peer.conn]);
-
-  // Message sending logic
-  const sendMessage = useCallback(() => {
-    const connection = peer.conn;
-    if (connection && connection.open === true) {
-      connection.send(message);
-      setReceivedMessages((prev) => [...prev, `Sent: ${message}`]);
-      setMessage("");
-    } else {
-      peer.setError("Connection is not open.");
-    }
-  }, [message, peer]);
+  // Message sending logic (per connection)
+  const sendMessage = useCallback(
+    (connId: string) => {
+      const connection = peer.connections[connId];
+      if (connection && connection.open === true) {
+        setConnStates((prev) => ({
+          ...prev,
+          [connId]: {
+            ...prev[connId],
+            receivedMessages: [
+              ...prev[connId].receivedMessages,
+              `Sent: ${prev[connId].message}`,
+            ],
+            message: "",
+          },
+        }));
+        connection.send(connStates[connId].message);
+      } else {
+        peer.setError("Connection is not open.");
+      }
+    },
+    [connStates, peer.connections]
+  );
 
   const handleCopy = useCallback(
     async (text: string) => {
@@ -194,29 +274,86 @@ export default function App() {
           targetPeerId={peer.targetPeerId}
           setTargetPeerId={peer.setTargetPeerId}
         />
-        {peer.step === "connected" && (
-          <FileTransfer
-            selectedFile={selectedFile}
-            isSendingFile={isSendingFile}
-            isReceivingFile={isReceivingFile}
-            fileSendProgress={fileSendProgress}
-            fileReceiveProgress={fileReceiveProgress}
-            receivedFile={receivedFile}
-            expectedFileName={expectedFileName}
-            expectedFileSize={expectedFileSize}
-            handleFileChange={handleFileChange}
-            handleDrop={handleDrop}
-            handleDragOver={handleDragOver}
-            sendFile={sendFile}
-          />
+        {tabIds.length > 0 && (
+          <div className="flex flex-col w-full">
+            <div className="flex border-b mb-4">
+              {tabIds.map((id) => (
+                <button
+                  key={id}
+                  title={id}
+                  className={`px-4 py-2 -mb-px border-b-2 truncate max-w-[10rem] ${
+                    activeConnId === id
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-gray-500"
+                  }`}
+                  onClick={() => setActiveConnId(id)}
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {id.slice(0, 8)}...
+                </button>
+              ))}
+            </div>
+            {activeConnId && connStates[activeConnId] && (
+              <div className="flex flex-col gap-6">
+                <FileTransfer
+                  selectedFile={connStates[activeConnId].selectedFile}
+                  isSendingFile={connStates[activeConnId].isSendingFile}
+                  isReceivingFile={connStates[activeConnId].isReceivingFile}
+                  fileSendProgress={connStates[activeConnId].fileSendProgress}
+                  fileReceiveProgress={
+                    connStates[activeConnId].fileReceiveProgress
+                  }
+                  receivedFile={connStates[activeConnId].receivedFile}
+                  expectedFileName={connStates[activeConnId].expectedFileName}
+                  expectedFileSize={connStates[activeConnId].expectedFileSize}
+                  handleFileChange={(e) => {
+                    const files = e.target.files;
+                    setConnStates((prev) => ({
+                      ...prev,
+                      [activeConnId]: {
+                        ...prev[activeConnId],
+                        selectedFile: files && files[0] ? files[0] : null,
+                      },
+                    }));
+                  }}
+                  handleDrop={(e) => {
+                    e.preventDefault();
+                    if (
+                      e.dataTransfer &&
+                      e.dataTransfer.files &&
+                      e.dataTransfer.files[0]
+                    ) {
+                      setConnStates((prev) => ({
+                        ...prev,
+                        [activeConnId]: {
+                          ...prev[activeConnId],
+                          selectedFile: e.dataTransfer.files[0],
+                        },
+                      }));
+                    }
+                  }}
+                  handleDragOver={(e) => e.preventDefault()}
+                  sendFile={() => sendFile(activeConnId)}
+                />
+                <MessagePanel
+                  message={connStates[activeConnId].message}
+                  setMessage={(msg: string) =>
+                    setConnStates((prev) => ({
+                      ...prev,
+                      [activeConnId]: { ...prev[activeConnId], message: msg },
+                    }))
+                  }
+                  sendMessage={() => sendMessage(activeConnId)}
+                  receivedMessages={connStates[activeConnId].receivedMessages}
+                />
+              </div>
+            )}
+          </div>
         )}
-        <hr className="my-4" />
-        <MessagePanel
-          message={message}
-          setMessage={setMessage}
-          sendMessage={sendMessage}
-          receivedMessages={receivedMessages}
-        />
       </header>
     </div>
   );
