@@ -4,9 +4,29 @@ import SessionManager from "./components/SessionManager";
 import FileTransfer from "./components/FileTransfer";
 import MessagePanel from "./components/MessagePanel";
 import type { ReceivedFile } from "./types";
-import { FiCopy, FiTrash2, FiRefreshCw } from "react-icons/fi";
+import { FiCopy, FiTrash2, FiRefreshCw, FiSun, FiMoon } from "react-icons/fi";
 
 export default function App() {
+  // Theme state
+  const getSystemTheme = () =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  const [theme, setTheme] = useState<string>(() => {
+    const stored = localStorage.getItem("theme");
+    return stored || getSystemTheme();
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
   // Peer connection/session state
   const peer = usePeerConnection();
 
@@ -201,11 +221,20 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8">
-      <header className="w-full max-w-2xl bg-white rounded-lg shadow p-8 flex flex-col gap-6">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-2">
-          Fast Free File Transfer
-        </h1>
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex flex-col items-center py-8 transition-colors">
+      <header className="w-full max-w-2xl bg-white dark:bg-zinc-800 rounded-lg shadow p-8 flex flex-col gap-6 transition-colors">
+        <div className="relative flex items-center mb-2 min-h-[2.5rem]">
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-3xl font-bold text-blue-600 dark:text-blue-400 text-center w-max pointer-events-none select-none">
+            Fast Free File Transfer
+          </h1>
+          <button
+            className="ml-auto px-3 py-1 rounded bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors z-10"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title="Toggle theme"
+          >
+            {theme === "dark" ? <FiMoon size={20} /> : <FiSun size={20} />}
+          </button>
+        </div>
         <SessionManager
           step={peer.step}
           sessionUrl={peer.sessionUrl}
@@ -227,12 +256,12 @@ export default function App() {
                   <button
                     key={id}
                     title={id}
-                    className={`px-4 py-2 -mb-px border-b-2 truncate max-w-[10rem] ${
+                    className={`px-4 py-2 -mb-px border-b-2 truncate max-w-[10rem] transition-colors ${
                       activeConnId === id
-                        ? "border-blue-600 text-blue-600 bg-white"
+                        ? "border-blue-600 text-blue-600 bg-white dark:bg-zinc-800 dark:text-blue-400"
                         : isOpen
-                        ? "border-transparent text-gray-500 bg-gray-100"
-                        : "border-transparent text-gray-400 bg-gray-50 opacity-60"
+                        ? "border-transparent text-gray-500 bg-gray-100 dark:bg-zinc-900 dark:text-gray-300"
+                        : "border-transparent text-gray-400 bg-gray-50 dark:bg-zinc-900 opacity-60 dark:text-gray-500"
                     }`}
                     onClick={() => setActiveConnId(id)}
                     style={{
@@ -250,14 +279,15 @@ export default function App() {
             {activeConnId && connStates[activeConnId] && (
               <div className="flex flex-row gap-2 mb-4 items-center self-end">
                 <button
-                  className="p-2 rounded hover:bg-gray-200"
+                  className="p-2 rounded bg-white dark:bg-zinc-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-600 transition-colors"
                   title="Copy ID"
                   onClick={() => handleCopy(activeConnId)}
                 >
                   <FiCopy size={18} />
                 </button>
                 <button
-                  className="p-2 rounded hover:bg-red-100 text-red-600"
+                  // Previous: bg-red-500 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-700
+                  className="p-2 rounded bg-white dark:bg-zinc-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-600 transition-colors"
                   title="Delete Tab"
                   onClick={() => {
                     const connection = peer.connections[activeConnId];
@@ -293,7 +323,8 @@ export default function App() {
                   peer.connections[activeConnId] &&
                   peer.connections[activeConnId].open !== true && (
                     <button
-                      className="p-2 rounded hover:bg-green-100 text-green-600"
+                      // Previous: bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700
+                      className="p-2 rounded bg-white dark:bg-zinc-700 text-gray-700 dark:text-white hover:bg-gray-100 dark:hover:bg-zinc-600 transition-colors"
                       title="Reload Connection"
                       onClick={() => {
                         const newConn =
