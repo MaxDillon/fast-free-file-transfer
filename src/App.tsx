@@ -247,10 +247,20 @@ export default function App() {
           error={!errorDismissed ? peer.error : ""}
           onStartSession={peer.startSession}
           onCopy={handleCopy}
+          onCopyUuid={async (uuid) => {
+            try {
+              await navigator.clipboard.writeText(uuid);
+              peer.setCopySuccess("Copied!");
+              setTimeout(() => peer.setCopySuccess(""), 1500);
+            } catch {
+              peer.setCopySuccess("Failed to copy");
+            }
+          }}
           onConnect={peer.handleConnectToPeer}
           targetPeerId={peer.targetPeerId}
           setTargetPeerId={peer.setTargetPeerId}
           onDismissError={() => setErrorDismissed(true)}
+          peerId={peer.peerId}
         />
         {tabIds.length > 0 && (
           <div className="flex flex-col w-full">

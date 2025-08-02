@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { FiLink, FiCopy } from "react-icons/fi";
 
 interface SessionManagerProps {
   step: string;
@@ -7,10 +8,12 @@ interface SessionManagerProps {
   error: string;
   onStartSession: () => void;
   onCopy: (text: string) => void;
+  onCopyUuid: (uuid: string) => void;
   onConnect: (peerId: string) => void;
   targetPeerId: string;
   setTargetPeerId: (id: string) => void;
   onDismissError?: () => void;
+  peerId: string;
 }
 
 const SessionManager: React.FC<SessionManagerProps> = ({
@@ -20,10 +23,12 @@ const SessionManager: React.FC<SessionManagerProps> = ({
   error,
   onStartSession,
   onCopy,
+  onCopyUuid,
   onConnect,
   targetPeerId,
   setTargetPeerId,
   onDismissError,
+  peerId,
 }) => {
   // Automatically start a session on mount if not already started
   useEffect(() => {
@@ -65,39 +70,50 @@ const SessionManager: React.FC<SessionManagerProps> = ({
               onClick={onDismissError}
               title="Dismiss error"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
+              <FiCopy size={16} />
             </button>
           )}
         </div>
       )}
       {/* Connection controls always visible */}
       <div className="flex flex-col gap-2 items-center">
-        <div className="text-gray-700 dark:text-gray-200">
-          Share this link to connect:
-        </div>
-        <div className="flex gap-2 items-center">
-          <input
-            className="border px-2 py-1 rounded w-full bg-white dark:bg-zinc-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-zinc-700 focus:ring-2 focus:ring-blue-400 focus:outline-none transition-colors"
-            value={sessionUrl}
-            readOnly
-          />
+        <div className="text-gray-700 dark:text-gray-200">Your Peer ID:</div>
+        <div className="flex gap-2 items-center max-w-[52ch] w-full">
+          <div className="relative flex items-center flex-1 min-w-0">
+            <input
+              className="border px-2 py-1 rounded bg-white dark:bg-zinc-800 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-zinc-700 focus:ring-2 focus:ring-blue-400 focus:outline-none transition-colors pr-10 text-ellipsis overflow-hidden whitespace-nowrap flex-1 min-w-0 font-mono"
+              value={peerId}
+              readOnly
+            />
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-60 hover:opacity-100"
+              onClick={() => onCopyUuid(peerId)}
+              tabIndex={-1}
+              title="Copy Peer ID"
+              type="button"
+            >
+              <svg
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
           <button
-            className="bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors"
+            className="bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-gray-200 px-2 py-1 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors flex items-center gap-1 whitespace-nowrap flex-shrink-0"
             onClick={() => onCopy(sessionUrl)}
+            title="Copy Link"
           >
-            Copy
+            <FiLink size={18} />
+            <span>Copy Link</span>
           </button>
         </div>
         {copySuccess && (
